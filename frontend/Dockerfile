@@ -2,7 +2,11 @@
 FROM node:20-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json* ./
-RUN npm install --legacy-peer-deps
+# Use HTTP for apk repositories to avoid TLS errors, then install CA certs and npm deps
+RUN sed -i 's/https:\/\/dl-cdn.alpinelinux.org/http:\/\/dl-cdn.alpinelinux.org/g' /etc/apk/repositories && \
+    apk add --no-cache ca-certificates && \
+    npm config set strict-ssl false && \
+    npm install --legacy-peer-deps
 
 # Stage 2: Build
 FROM node:20-alpine AS build

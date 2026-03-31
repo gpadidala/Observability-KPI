@@ -264,7 +264,13 @@ export default function SettingsPage() {
       }
       router.push("/");
     } catch (err: any) {
-      setGenerateError(err.message ?? "Report generation failed");
+      setGenerateError(
+        typeof err === "string"
+          ? err
+          : err?.message
+            ? err.message
+            : JSON.stringify(err)
+      );
     } finally {
       setGenerating(false);
     }
