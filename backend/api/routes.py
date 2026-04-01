@@ -177,144 +177,274 @@ async def _compute_pillar_kpis(
     return PillarKPIs(pillar=pillar, kpis=results)
 
 
-def _get_kpi_definitions(pillar: str) -> list[dict]:
-    """Return the metric definitions for a pillar.
+def _make_avail_kpis(metric: str, ingest_re: str, read_re: str) -> list[dict]:
+    """Generate availability KPI definitions (overall, ingest-path, read-path)."""
+    ok_all = "sum(rate(%s{status_code=~'2..'}[5m]))" % metric
+    total_all = "sum(rate(%s[5m]))" % metric
+    ok_ingest = "sum(rate(%s{status_code=~'2..', route=~'%s'}[5m]))" % (metric, ingest_re)
+    total_ingest = "sum(rate(%s{route=~'%s'}[5m]))" % (metric, ingest_re)
+    ok_read = "sum(rate(%s{status_code=~'2..', route=~'%s'}[5m]))" % (metric, read_re)
+    total_read = "sum(rate(%s{route=~'%s'}[5m]))" % (metric, read_re)
+    return [
+        {
+            "name": "Uptime / Availability",
+            "query": {"expr": "clamp_max(%s / %s * 100, 100)" % (ok_all, total_all), "instant": True},
+            "unit": "%", "extractor": "single", "aggregation": "mean",
+        },
+        {
+            "name": "Availability (Ingest)",
+            "query": {"expr": "clamp_max(%s / %s * 100, 100)" % (ok_ingest, total_ingest), "instant": True},
+            "unit": "%", "extractor": "single", "aggregation": "mean",
+        },
+        {
+            "name": "Availability (Read)",
+            "query": {"expr": "clamp_max(%s / %s * 100, 100)" % (ok_read, total_read), "instant": True},
+            "unit": "%", "extractor": "single", "aggregation": "mean",
+        },
+    ]
 
-    In a production deployment these would be loaded from a configuration
-    file or database.  Here they are defined inline for clarity.
+
+def _make_resource_kpis(ns: str) -> list[dict]:
+    """Generate CPU / Memory peak-utilization KPI definitions."""
+    return [
+        {
+            "name": "Peak CPU Utilization",
+            "query": {
+                "expr": "max(rate(container_cpu_usage_seconds_total{namespace=~'%s'}[5m])) * 100" % ns,
+                "instant": True,
+            },
+            "unit": "%", "extractor": "single", "aggregation": "max",
+        },
+        {
+            "name": "Peak Memory Utilization",
+            "query": {
+                "expr": (
+                    "max(container_memory_working_set_bytes{namespace=~'%s'}) / "
+                    "scalar(sum(machine_memory_bytes) / count(machine_memory_bytes)) * 100"
+                ) % ns,
+                "instant": True,
+            },
+            "unit": "%", "extractor": "single", "aggregation": "max",
+        },
+    ]
+
+
+def _make_cost_kpis(ns: str, volume_expr: str) -> list[dict]:
+    """Generate cost KPI definitions (monthly cost, cost-per-GB)."""
+    return [
+        {
+            "name": "Total Monthly Cost",
+            "query": {
+                "expr": "sum(namespace_cost_per_month{namespace=~'%s'}) or vector(0)" % ns,
+                "instant": True,
+            },
+            "unit": "$", "extractor": "single", "aggregation": "sum",
+        },
+        {
+            "name": "Cost per GB Ingested",
+            "query": {
+                "expr": (
+                    "(sum(namespace_cost_per_month{namespace=~'%s'}) or vector(0)) / "
+                    "clamp_min(%s / 1e9, 0.001)"
+                ) % (ns, volume_expr),
+                "instant": True,
+            },
+            "unit": "$/GB", "extractor": "single", "aggregation": "mean",
+        },
+    ]
+
+
+def _get_kpi_definitions(pillar: str) -> list[dict]:
+    """Return KPI definitions for a pillar.
+
+    KPI names are aligned with frontend page search fragments:
+    availability/uptime, ingest+avail, read+avail, loss, cpu, memory,
+    monthly cost, cost per gb, ingest (volume), latency.
     """
     definitions: dict[str, list[dict]] = {
         "mimir": [
+            *_make_avail_kpis(
+                "cortex_request_duration_seconds_count",
+                "/distributor.Distributor/Push|api_v1_push|.*write.*",
+                "api_prom_api_v1_query.*|api_prom_api_v1_labels|.*read.*",
+            ),
             {
-                "name": "Mimir Ingestion Rate",
-                "query": {"expr": "sum(rate(cortex_ingester_ingested_samples_total[5m]))", "instant": True},
-                "unit": "samples/s",
-                "extractor": "single",
-                "aggregation": "mean",
-            },
-            {
-                "name": "Mimir Query Success Rate",
+                "name": "Data Loss Rate",
                 "query": {
                     "expr": (
-                        "sum(rate(cortex_request_duration_seconds_count{status_code=~'2..'}[5m])) / "
-                        "sum(rate(cortex_request_duration_seconds_count[5m])) * 100"
+                        "clamp_min(sum(rate(cortex_discarded_samples_total[5m])) / "
+                        "sum(rate(cortex_ingester_ingested_samples_total[5m])) * 100, 0)"
                     ),
                     "instant": True,
                 },
-                "unit": "%",
-                "extractor": "single",
-                "aggregation": "mean",
+                "unit": "%", "extractor": "single", "aggregation": "mean",
             },
             {
-                "name": "Mimir P99 Query Latency",
+                "name": "Ingestion Volume",
+                "query": {
+                    "expr": "sum(increase(cortex_ingester_ingested_samples_total[24h])) * 2",
+                    "instant": True,
+                },
+                "unit": "bytes", "extractor": "single", "aggregation": "sum",
+            },
+            *_make_resource_kpis(".*mimir.*|.*cortex.*"),
+            {
+                "name": "P99 Query Latency",
                 "query": {
                     "expr": "histogram_quantile(0.99, sum(rate(cortex_request_duration_seconds_bucket{route=~'api_prom_api_v1_query.*'}[5m])) by (le))",
                     "instant": True,
                 },
-                "unit": "s",
-                "extractor": "single",
-                "aggregation": "max",
+                "unit": "s", "extractor": "single", "aggregation": "max",
             },
+            *_make_cost_kpis(
+                ".*mimir.*|.*cortex.*",
+                "sum(increase(cortex_ingester_ingested_samples_total[30d])) * 2",
+            ),
         ],
         "loki": [
+            *_make_avail_kpis(
+                "loki_request_duration_seconds_count",
+                ".*push.*|.*distributor.*|/loki.Pusher/Push",
+                ".*query.*|.*tail.*|loki_api_v1.*",
+            ),
             {
-                "name": "Loki Ingestion Rate",
-                "query": {"expr": "sum(rate(loki_distributor_bytes_received_total[5m]))", "instant": True},
-                "unit": "bytes/s",
-                "extractor": "single",
-                "aggregation": "mean",
-            },
-            {
-                "name": "Loki Query Success Rate",
+                "name": "Data Loss Rate",
                 "query": {
                     "expr": (
-                        "sum(rate(loki_request_duration_seconds_count{status_code=~'2..'}[5m])) / "
-                        "sum(rate(loki_request_duration_seconds_count[5m])) * 100"
+                        "clamp_min(sum(rate(loki_distributor_lines_dropped_total[5m])) / "
+                        "sum(rate(loki_distributor_lines_received_total[5m])) * 100, 0)"
                     ),
                     "instant": True,
                 },
-                "unit": "%",
-                "extractor": "single",
-                "aggregation": "mean",
+                "unit": "%", "extractor": "single", "aggregation": "mean",
             },
             {
-                "name": "Loki P99 Query Latency",
+                "name": "Ingestion Volume",
+                "query": {
+                    "expr": "sum(increase(loki_distributor_bytes_received_total[24h]))",
+                    "instant": True,
+                },
+                "unit": "bytes", "extractor": "single", "aggregation": "sum",
+            },
+            *_make_resource_kpis(".*loki.*"),
+            {
+                "name": "P99 Query Latency",
                 "query": {
                     "expr": "histogram_quantile(0.99, sum(rate(loki_request_duration_seconds_bucket[5m])) by (le))",
                     "instant": True,
                 },
-                "unit": "s",
-                "extractor": "single",
-                "aggregation": "max",
+                "unit": "s", "extractor": "single", "aggregation": "max",
             },
+            *_make_cost_kpis(
+                ".*loki.*",
+                "sum(increase(loki_distributor_bytes_received_total[30d]))",
+            ),
         ],
         "tempo": [
+            *_make_avail_kpis(
+                "tempo_request_duration_seconds_count",
+                ".*push.*|.*distributor.*|/tempo.Pusher/Push",
+                ".*query.*|.*traces.*|/tempo.Querier/.*",
+            ),
             {
-                "name": "Tempo Ingestion Rate",
-                "query": {"expr": "sum(rate(tempo_distributor_spans_received_total[5m]))", "instant": True},
-                "unit": "spans/s",
-                "extractor": "single",
-                "aggregation": "mean",
-            },
-            {
-                "name": "Tempo Query Success Rate",
+                "name": "Data Loss Rate",
                 "query": {
                     "expr": (
-                        "sum(rate(tempo_request_duration_seconds_count{status_code=~'2..'}[5m])) / "
-                        "sum(rate(tempo_request_duration_seconds_count[5m])) * 100"
+                        "clamp_min(sum(rate(tempo_discarded_spans_total[5m])) / "
+                        "sum(rate(tempo_distributor_spans_received_total[5m])) * 100, 0)"
                     ),
                     "instant": True,
                 },
-                "unit": "%",
-                "extractor": "single",
-                "aggregation": "mean",
+                "unit": "%", "extractor": "single", "aggregation": "mean",
             },
+            {
+                "name": "Ingestion Volume",
+                "query": {
+                    "expr": "sum(increase(tempo_distributor_bytes_received_total[24h]))",
+                    "instant": True,
+                },
+                "unit": "bytes", "extractor": "single", "aggregation": "sum",
+            },
+            *_make_resource_kpis(".*tempo.*"),
+            {
+                "name": "P99 Query Latency",
+                "query": {
+                    "expr": "histogram_quantile(0.99, sum(rate(tempo_request_duration_seconds_bucket[5m])) by (le))",
+                    "instant": True,
+                },
+                "unit": "s", "extractor": "single", "aggregation": "max",
+            },
+            *_make_cost_kpis(
+                ".*tempo.*",
+                "sum(increase(tempo_distributor_bytes_received_total[30d]))",
+            ),
         ],
         "pyroscope": [
+            *_make_avail_kpis(
+                "pyroscope_request_duration_seconds_count",
+                ".*push.*|.*ingest.*",
+                ".*query.*|.*render.*|.*select.*",
+            ),
             {
-                "name": "Pyroscope Ingestion Rate",
-                "query": {"expr": "sum(rate(pyroscope_ingestion_total[5m]))", "instant": True},
-                "unit": "profiles/s",
-                "extractor": "single",
-                "aggregation": "mean",
-            },
-            {
-                "name": "Pyroscope Query Success Rate",
+                "name": "Data Loss Rate",
                 "query": {
                     "expr": (
-                        "sum(rate(pyroscope_request_duration_seconds_count{status_code=~'2..'}[5m])) / "
-                        "sum(rate(pyroscope_request_duration_seconds_count[5m])) * 100"
+                        "clamp_min(sum(rate(pyroscope_discarded_samples_total[5m])) / "
+                        "sum(rate(pyroscope_ingestion_total[5m])) * 100, 0)"
                     ),
                     "instant": True,
                 },
-                "unit": "%",
-                "extractor": "single",
-                "aggregation": "mean",
+                "unit": "%", "extractor": "single", "aggregation": "mean",
             },
+            {
+                "name": "Ingestion Volume",
+                "query": {
+                    "expr": "sum(increase(pyroscope_ingested_bytes_total[24h]))",
+                    "instant": True,
+                },
+                "unit": "bytes", "extractor": "single", "aggregation": "sum",
+            },
+            *_make_resource_kpis(".*pyroscope.*"),
+            {
+                "name": "P99 Query Latency",
+                "query": {
+                    "expr": "histogram_quantile(0.99, sum(rate(pyroscope_request_duration_seconds_bucket[5m])) by (le))",
+                    "instant": True,
+                },
+                "unit": "s", "extractor": "single", "aggregation": "max",
+            },
+            *_make_cost_kpis(
+                ".*pyroscope.*",
+                "sum(increase(pyroscope_ingested_bytes_total[30d]))",
+            ),
         ],
         "grafana": [
+            *_make_avail_kpis(
+                "grafana_http_request_duration_seconds_count",
+                ".*POST.*|.*PUT.*|.*save.*",
+                ".*GET.*|.*dashboard.*|.*search.*",
+            ),
             {
-                "name": "Grafana API Success Rate",
-                "query": {
-                    "expr": (
-                        "sum(rate(grafana_http_request_duration_seconds_count{status_code=~'2..'}[5m])) / "
-                        "sum(rate(grafana_http_request_duration_seconds_count[5m])) * 100"
-                    ),
-                    "instant": True,
-                },
-                "unit": "%",
-                "extractor": "single",
-                "aggregation": "mean",
+                "name": "Data Loss Rate",
+                "query": {"expr": "vector(0)", "instant": True},
+                "unit": "%", "extractor": "single", "aggregation": "mean",
             },
+            *_make_resource_kpis(".*grafana.*"),
             {
-                "name": "Grafana P99 API Latency",
+                "name": "P99 API Latency",
                 "query": {
                     "expr": "histogram_quantile(0.99, sum(rate(grafana_http_request_duration_seconds_bucket[5m])) by (le))",
                     "instant": True,
                 },
-                "unit": "s",
-                "extractor": "single",
-                "aggregation": "max",
+                "unit": "s", "extractor": "single", "aggregation": "max",
+            },
+            {
+                "name": "Total Monthly Cost",
+                "query": {
+                    "expr": "sum(namespace_cost_per_month{namespace=~'.*grafana.*'}) or vector(0)",
+                    "instant": True,
+                },
+                "unit": "$", "extractor": "single", "aggregation": "sum",
             },
         ],
     }

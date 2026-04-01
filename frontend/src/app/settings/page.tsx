@@ -19,6 +19,7 @@ import {
   Key,
   Loader2,
   Lock,
+  Plug2,
   Settings,
   XCircle,
 } from "lucide-react";
@@ -178,6 +179,7 @@ interface SavedEnvConfig {
   grafana_url: string;
   service_account_token: string;
   datasource_uids: Record<string, string>;
+  mcp_servers?: Record<string, string>;
 }
 
 const DEFAULT_DS_UIDS: Record<string, string> = {
@@ -186,6 +188,22 @@ const DEFAULT_DS_UIDS: Record<string, string> = {
   tempo: "",
   pyroscope: "",
   grafana: "",
+};
+
+const DEFAULT_MCP_SERVERS: Record<string, string> = {
+  grafana: "",
+  mimir: "",
+  loki: "",
+  tempo: "",
+  pyroscope: "",
+};
+
+const MCP_PLACEHOLDERS: Record<string, string> = {
+  grafana: "npx @anthropic/mcp-grafana or http://localhost:4100",
+  mimir: "http://localhost:9009/mcp",
+  loki: "http://localhost:3100/mcp",
+  tempo: "http://localhost:3200/mcp",
+  pyroscope: "http://localhost:4040/mcp",
 };
 
 function loadEnvConfig(env: "PERF" | "PROD"): SavedEnvConfig | null {
@@ -223,6 +241,10 @@ export default function SettingsPage() {
     ...DEFAULT_DS_UIDS,
   });
 
+  const [mcpServers, setMcpServers] = useState<Record<string, string>>({
+    ...DEFAULT_MCP_SERVERS,
+  });
+
   const [quickRange, setQuickRange] = useState<7 | 14 | 30 | null>(30);
   const [startDate, setStartDate] = useState(daysAgo(30));
   const [endDate, setEndDate] = useState(today());
@@ -242,10 +264,12 @@ export default function SettingsPage() {
       setGrafanaUrl(saved.grafana_url ?? "");
       setToken(saved.service_account_token ?? "");
       setDsUIDs({ ...DEFAULT_DS_UIDS, ...saved.datasource_uids });
+      setMcpServers({ ...DEFAULT_MCP_SERVERS, ...saved.mcp_servers });
     } else {
       setGrafanaUrl("");
       setToken("");
       setDsUIDs({ ...DEFAULT_DS_UIDS });
+      setMcpServers({ ...DEFAULT_MCP_SERVERS });
     }
     setValidationResult(null);
   }, [environment]);
@@ -257,8 +281,9 @@ export default function SettingsPage() {
       grafana_url: grafanaUrl,
       service_account_token: token,
       datasource_uids: dsUIDs,
+      mcp_servers: mcpServers,
     });
-  }, [isClient, environment, grafanaUrl, token, dsUIDs]);
+  }, [isClient, environment, grafanaUrl, token, dsUIDs, mcpServers]);
 
   /* ---- Computed ---- */
   const rangeDays = useMemo(() => daysBetween(startDate, endDate), [startDate, endDate]);
@@ -482,7 +507,36 @@ export default function SettingsPage() {
       </GlassCard>
 
       {/* ================================================================== */}
-      {/*  3. Time Range                                                     */}
+      {/*  3. MCP Server Configuration                                      */}
+      {/* ================================================================== */}
+      <GlassCard delay={0.25}>
+        <SectionHeader icon={Plug2} title="MCP Server Configuration" />
+        <p className="mb-4 text-xs text-slate-500">
+          Connect Model Context Protocol (MCP) servers for each observability
+          pillar to enable AI-powered data retrieval and analysis.
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {Object.entries(mcpServers).map(([key, value]) => {
+            const IconComp = pillarIcons[key] ?? Database;
+            return (
+              <FormInput
+                key={key}
+                id={`mcp-${key}`}
+                label={`${key.charAt(0).toUpperCase() + key.slice(1)} MCP Server`}
+                icon={IconComp}
+                placeholder={MCP_PLACEHOLDERS[key] ?? "MCP server URL"}
+                value={value}
+                onChange={(v) =>
+                  setMcpServers((prev) => ({ ...prev, [key]: v }))
+                }
+              />
+            );
+          })}
+        </div>
+      </GlassCard>
+
+      {/* ================================================================== */}
+      {/*  4. Time Range                                                     */}
       {/* ================================================================== */}
       <GlassCard delay={0.3}>
         <SectionHeader icon={Clock} title="Query Time Range" />

@@ -592,8 +592,8 @@ export default function PillarDrilldownPage() {
                     Ingestion Volume
                   </p>
                   <p className="mt-1 text-lg font-bold text-cyan-400">
-                    {currentDemo.ingestionGB > 0
-                      ? `${currentDemo.ingestionGB} GB`
+                    {findKpi("ingestion volume")
+                      ? formatBytes(findKpi("ingestion volume")!.value)
                       : "N/A"}
                   </p>
                 </div>
@@ -603,7 +603,7 @@ export default function PillarDrilldownPage() {
                     Uptime
                   </p>
                   <p className="mt-1 text-lg font-bold text-emerald-400">
-                    {formatPercent(currentDemo.uptime)}
+                    {formatPercent(findKpi("availability")?.value ?? 0)}
                   </p>
                 </div>
                 {/* DLR stat */}
@@ -614,10 +614,10 @@ export default function PillarDrilldownPage() {
                   <p
                     className={cn(
                       "mt-1 text-lg font-bold",
-                      kpiStatusColor("loss", currentDemo.dlr),
+                      kpiStatusColor("loss", findKpi("loss")?.value ?? 0),
                     )}
                   >
-                    {formatPercent(currentDemo.dlr, 3)}
+                    {formatPercent(findKpi("loss")?.value ?? 0, 3)}
                   </p>
                 </div>
               </div>
