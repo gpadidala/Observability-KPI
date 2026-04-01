@@ -81,7 +81,7 @@ async def _query_datasource(
     payload = {
         "queries": [
             {
-                "datasourceId": datasource_uid,
+                "datasource": {"uid": datasource_uid},
                 "refId": "A",
                 **query_body,
             }
@@ -595,24 +595,34 @@ async def validate_connection(config: EnvironmentConfig) -> dict:
             resp = await client.get(url, headers=_build_headers(config))
             resp.raise_for_status()
             body = resp.json()
+
+            # List configured datasource UIDs
+            configured_ds = [
+                f"{pillar}:{uid}"
+                for pillar, uid in config.datasource_uids.items()
+                if uid
+            ]
+
             return {
-                "status": "connected",
-                "grafana_version": body.get("version", "unknown"),
-                "database": body.get("database", "unknown"),
-                "environment": config.environment,
+                "success": True,
+                "message": (
+                    f"Connected to Grafana {body.get('version', 'unknown')} "
+                    f"({config.environment})"
+                ),
+                "datasources": configured_ds,
             }
         except httpx.HTTPStatusError as exc:
             logger.error("Grafana health check failed: %s", exc.response.status_code)
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail=f"Grafana returned HTTP {exc.response.status_code}",
-            ) from exc
+            return {
+                "success": False,
+                "message": f"Grafana returned HTTP {exc.response.status_code}",
+            }
         except httpx.RequestError as exc:
             logger.error("Cannot reach Grafana: %s", exc)
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail=f"Cannot reach Grafana at {config.grafana_url}: {exc}",
-            ) from exc
+            return {
+                "success": False,
+                "message": f"Cannot reach Grafana at {config.grafana_url}: {exc}",
+            }
 
 
 # ---------------------------------------------------------------------------

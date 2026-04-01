@@ -136,7 +136,7 @@ const pillarIcons: Record<string, React.ComponentType<{ className?: string }>> =
   loki: FileText,
   tempo: GitBranch,
   pyroscope: Flame,
-  prometheus: Activity,
+  grafana: Activity,
 };
 
 /* -------------------------------------------------------------------------- */
@@ -169,6 +169,44 @@ function useIsClient() {
 }
 
 /* -------------------------------------------------------------------------- */
+/*  localStorage helpers                                                      */
+/* -------------------------------------------------------------------------- */
+
+const STORAGE_KEY_PREFIX = "obs-kpi-settings";
+
+interface SavedEnvConfig {
+  grafana_url: string;
+  service_account_token: string;
+  datasource_uids: Record<string, string>;
+}
+
+const DEFAULT_DS_UIDS: Record<string, string> = {
+  mimir: "",
+  loki: "",
+  tempo: "",
+  pyroscope: "",
+  grafana: "",
+};
+
+function loadEnvConfig(env: "PERF" | "PROD"): SavedEnvConfig | null {
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}-${env}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as SavedEnvConfig;
+  } catch {
+    return null;
+  }
+}
+
+function saveEnvConfig(env: "PERF" | "PROD", config: SavedEnvConfig): void {
+  try {
+    localStorage.setItem(`${STORAGE_KEY_PREFIX}-${env}`, JSON.stringify(config));
+  } catch {
+    /* localStorage might be full or unavailable */
+  }
+}
+
+/* -------------------------------------------------------------------------- */
 /*  Page Component                                                            */
 /* -------------------------------------------------------------------------- */
 
@@ -182,11 +220,7 @@ export default function SettingsPage() {
   const [token, setToken] = useState("");
 
   const [dsUIDs, setDsUIDs] = useState<Record<string, string>>({
-    mimir: "",
-    loki: "",
-    tempo: "",
-    pyroscope: "",
-    prometheus: "",
+    ...DEFAULT_DS_UIDS,
   });
 
   const [quickRange, setQuickRange] = useState<7 | 14 | 30 | null>(30);
@@ -201,20 +235,51 @@ export default function SettingsPage() {
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [exporting, setExporting] = useState<"pdf" | "csv" | "json" | null>(null);
 
+  /* ---- Load saved settings on mount & env switch ---- */
+  useEffect(() => {
+    const saved = loadEnvConfig(environment);
+    if (saved) {
+      setGrafanaUrl(saved.grafana_url ?? "");
+      setToken(saved.service_account_token ?? "");
+      setDsUIDs({ ...DEFAULT_DS_UIDS, ...saved.datasource_uids });
+    } else {
+      setGrafanaUrl("");
+      setToken("");
+      setDsUIDs({ ...DEFAULT_DS_UIDS });
+    }
+    setValidationResult(null);
+  }, [environment]);
+
+  /* ---- Persist settings whenever they change ---- */
+  useEffect(() => {
+    if (!isClient) return;
+    saveEnvConfig(environment, {
+      grafana_url: grafanaUrl,
+      service_account_token: token,
+      datasource_uids: dsUIDs,
+    });
+  }, [isClient, environment, grafanaUrl, token, dsUIDs]);
+
   /* ---- Computed ---- */
   const rangeDays = useMemo(() => daysBetween(startDate, endDate), [startDate, endDate]);
   const chunkedWindows = rangeDays > 30 ? Math.ceil(rangeDays / 30) : 0;
   const isConnected = validationResult?.success === true;
 
-  /* ---- Build config ---- */
-  const buildConfig = useCallback((): EnvironmentConfig => ({
-    environment,
-    grafana_url: grafanaUrl,
-    service_account_token: token,
-    datasource_uids: dsUIDs,
-    time_range_start: startDate,
-    time_range_end: endDate,
-  }), [environment, grafanaUrl, token, dsUIDs, startDate, endDate]);
+  /* ---- Build config (filters out empty datasource UIDs) ---- */
+  const buildConfig = useCallback((): EnvironmentConfig => {
+    const filteredUIDs: Record<string, string> = {};
+    for (const [k, v] of Object.entries(dsUIDs)) {
+      if (v.trim()) filteredUIDs[k] = v.trim();
+    }
+    return {
+      environment,
+      grafana_url: grafanaUrl.trim(),
+      service_account_token: token,
+      datasource_uids: filteredUIDs,
+      time_range_start: startDate,
+      time_range_end: endDate,
+    };
+  }, [environment, grafanaUrl, token, dsUIDs, startDate, endDate]);
 
   /* ---- Quick range handler ---- */
   const applyQuickRange = useCallback((days: 7 | 14 | 30) => {

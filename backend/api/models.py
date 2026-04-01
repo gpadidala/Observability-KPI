@@ -31,8 +31,6 @@ class TimeWindow(BaseModel):
 # Configuration supplied at runtime by the caller
 # ---------------------------------------------------------------------------
 
-PILLAR_NAMES = Literal["mimir", "loki", "tempo", "pyroscope", "grafana"]
-
 class EnvironmentConfig(BaseModel):
     """Runtime configuration for a single Grafana environment.
 
@@ -50,9 +48,9 @@ class EnvironmentConfig(BaseModel):
     service_account_token: SecretStr = Field(
         ..., description="Grafana service-account token (never logged)"
     )
-    datasource_uids: dict[PILLAR_NAMES, str] = Field(
-        ...,
-        description="Mapping of observability pillar to Grafana datasource UID",
+    datasource_uids: dict[str, str] = Field(
+        default_factory=dict,
+        description="Mapping of observability pillar to Grafana datasource UID (partial is OK)",
         examples=[{
             "mimir": "abc123",
             "loki": "def456",
