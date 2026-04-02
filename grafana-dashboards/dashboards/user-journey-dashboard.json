@@ -1,0 +1,2206 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      },
+      {
+        "datasource": {
+          "type": "loki",
+          "uid": "${datasource_loki}"
+        },
+        "enable": true,
+        "expr": "{job=\"deployer\"} |= \"deployed\"",
+        "hide": false,
+        "iconColor": "#1E90FF",
+        "name": "Deployments",
+        "tagKeys": "deployment",
+        "titleFormat": "Deployment",
+        "type": "tags"
+      }
+    ]
+  },
+  "description": "Investigate a single user's complete journey across the application. Enter a user email, ID, or username to see their page views, clicks, API calls, errors, traces, performance metrics, and code-level profiles. Correlates Faro RUM, Loki logs, Tempo traces, Mimir metrics, and Pyroscope profiles.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 2,
+  "id": null,
+  "links": [
+    {
+      "asDropdown": true,
+      "icon": "external link",
+      "includeVars": true,
+      "keepTime": true,
+      "tags": ["observability"],
+      "targetBlank": true,
+      "title": "Observability Dashboards",
+      "tooltip": "Navigate to related observability dashboards",
+      "type": "dashboards"
+    }
+  ],
+  "panels": [
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+      "id": 100,
+      "title": "User Identity & Session Summary",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource_loki}"
+      },
+      "description": "User identity extracted from the first matching log line.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#6C63FF",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 6, "x": 0, "y": 1 },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "name",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "editorMode": "code",
+          "expr": "{job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | line_format \"{{.user_id}} — {{.email}} — {{.role}}\"",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "User Info",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource_loki}"
+      },
+      "description": "Total number of sessions initiated by this user in the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#6C63FF",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#6C63FF", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 3, "x": 6, "y": 1 },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "editorMode": "code",
+          "expr": "count_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"session_start\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Sessions",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource_loki}"
+      },
+      "description": "Total page views recorded by Faro RUM for this user.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#4FC3F7",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#4FC3F7", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 3, "x": 9, "y": 1 },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "editorMode": "code",
+          "expr": "count_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"page_view\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Page Views",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource_loki}"
+      },
+      "description": "Total errors this user encountered. Green < 1, yellow < 5, red >= 5.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 3, "x": 12, "y": 1 },
+      "id": 4,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "editorMode": "code",
+          "expr": "count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | level=\"error\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Errors Hit",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource_loki}"
+      },
+      "description": "Total API requests made by this user in the selected time range.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#00C48C",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#00C48C", "value": null }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 3, "x": 15, "y": 1 },
+      "id": 5,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "editorMode": "code",
+          "expr": "count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Total API Requests",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource_loki}"
+      },
+      "description": "Average response time for this user's requests. Green <= 0.3s, yellow <= 1.0s, red > 1.0s.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.3 },
+              { "color": "red", "value": 1.0 }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 3, "x": 18, "y": 1 },
+      "id": 6,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | unwrap duration(response_time) [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Avg Response Time",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "loki",
+        "uid": "${datasource_loki}"
+      },
+      "description": "Total time this user spent across all sessions.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#6C63FF",
+            "mode": "fixed"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#6C63FF", "value": null }
+            ]
+          },
+          "unit": "dtdurations"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 5, "w": 3, "x": 21, "y": 1 },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.4",
+      "targets": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "editorMode": "code",
+          "expr": "sum_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | unwrap duration(session_duration) [$__range])",
+          "queryType": "range",
+          "refId": "A"
+        }
+      ],
+      "title": "Total Time Spent",
+      "type": "stat"
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 6 },
+      "id": 200,
+      "title": "User Activity Timeline",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Full timeline of user activity across all signal types.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 40,
+                "gradientMode": "opacity",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "normal"
+                },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Page Views" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#4FC3F7", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "API Calls" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#00C48C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Errors" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF4757", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Clicks" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#6C63FF", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 7 },
+          "id": 8,
+          "options": {
+            "legend": {
+              "calcs": ["sum", "mean", "max"],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "count_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"page_view\" [$__auto])",
+              "legendFormat": "Page Views",
+              "queryType": "range",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | method!=\"\" [$__auto])",
+              "legendFormat": "API Calls",
+              "queryType": "range",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | level=\"error\" [$__auto])",
+              "legendFormat": "Errors",
+              "queryType": "range",
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "count_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"click\" [$__auto])",
+              "legendFormat": "Clicks",
+              "queryType": "range",
+              "refId": "D"
+            }
+          ],
+          "title": "Activity Timeline",
+          "type": "timeseries"
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
+      "id": 300,
+      "title": "Page-by-Page Journey — Faro RUM",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "User's navigation path in chronological order.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "id": 9,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"page_view\" | line_format \"{{.page_url}} | {{.page_title}} | {{.session_id}}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Pages Visited (Ordered)",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Time this user spent on each page.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "continuous-BlPu"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "id": 10,
+          "options": {
+            "displayMode": "gradient",
+            "maxVizHeight": 300,
+            "minVizHeight": 16,
+            "minVizWidth": 8,
+            "namePlacement": "auto",
+            "orientation": "horizontal",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "showUnfilled": true,
+            "sizing": "auto",
+            "valueMode": "color"
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (page_url) (sum_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"page_view\" | unwrap duration(time_on_page) [$__range]))",
+              "legendFormat": "{{page_url}}",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Time Spent Per Page",
+          "type": "bargauge"
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 400,
+      "title": "Web Vitals — User Experience",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Core Web Vitals this specific user experienced. Thresholds follow Google standards.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": { "mode": "dashed" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "LCP" },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        { "color": "green", "value": null },
+                        { "color": "yellow", "value": 2.5 },
+                        { "color": "red", "value": 4.0 }
+                      ]
+                    }
+                  },
+                  { "id": "unit", "value": "s" }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "FID" },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        { "color": "green", "value": null },
+                        { "color": "yellow", "value": 0.1 },
+                        { "color": "red", "value": 0.3 }
+                      ]
+                    }
+                  },
+                  { "id": "unit", "value": "s" }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "CLS" },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        { "color": "green", "value": null },
+                        { "color": "yellow", "value": 0.1 },
+                        { "color": "red", "value": 0.25 }
+                      ]
+                    }
+                  },
+                  { "id": "unit", "value": "none" }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "TTFB" },
+                "properties": [
+                  {
+                    "id": "thresholds",
+                    "value": {
+                      "mode": "absolute",
+                      "steps": [
+                        { "color": "green", "value": null },
+                        { "color": "yellow", "value": 0.8 },
+                        { "color": "red", "value": 1.8 }
+                      ]
+                    }
+                  },
+                  { "id": "unit", "value": "s" }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 25 },
+          "id": 11,
+          "options": {
+            "legend": {
+              "calcs": ["sum", "mean", "max", "lastNotNull"],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | measurement=\"lcp\" | unwrap duration(value) [$__auto]",
+              "legendFormat": "LCP",
+              "queryType": "range",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | measurement=\"fid\" | unwrap duration(value) [$__auto]",
+              "legendFormat": "FID",
+              "queryType": "range",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | measurement=\"cls\" | unwrap value [$__auto]",
+              "legendFormat": "CLS",
+              "queryType": "range",
+              "refId": "C"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | measurement=\"ttfb\" | unwrap duration(value) [$__auto]",
+              "legendFormat": "TTFB",
+              "queryType": "range",
+              "refId": "D"
+            }
+          ],
+          "title": "Core Web Vitals",
+          "type": "timeseries"
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 33 },
+      "id": 500,
+      "title": "API Activity & Backend Logs",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "All API endpoints this user called with method, path, status code, and count.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 34 },
+          "id": 12,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "topk(20, sum by (method, path, status) (count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" [$__range])))",
+              "instant": true,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ],
+          "title": "API Endpoints Hit",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Response time percentiles (P50, P95, P99) for this user's requests over time.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "P50" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#00C48C", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "P95" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FFB020", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "P99" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF4757", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 34 },
+          "id": 13,
+          "options": {
+            "legend": {
+              "calcs": ["sum", "mean", "max", "lastNotNull"],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "quantile_over_time(0.50, {job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | unwrap duration(response_time) [$__auto])",
+              "legendFormat": "P50",
+              "queryType": "range",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "quantile_over_time(0.95, {job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | unwrap duration(response_time) [$__auto])",
+              "legendFormat": "P95",
+              "queryType": "range",
+              "refId": "B"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "quantile_over_time(0.99, {job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | unwrap duration(response_time) [$__auto])",
+              "legendFormat": "P99",
+              "queryType": "range",
+              "refId": "C"
+            }
+          ],
+          "title": "Response Time Distribution",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Complete API log stream for this user. Click trace_id to jump to distributed trace.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 42 },
+          "id": 14,
+          "options": {
+            "dedupStrategy": "none",
+            "enableLogDetails": true,
+            "prettifyLogMessage": false,
+            "showCommonLabels": false,
+            "showLabels": false,
+            "showTime": true,
+            "sortOrder": "Descending",
+            "wrapLogMessage": true
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | line_format \"{{.timestamp}} [{{.method}}] {{.path}} → {{.status}} ({{.response_time}}) trace_id={{.trace_id}}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Full Request Log Stream",
+          "type": "logs",
+          "derivedFields": [
+            {
+              "matcherRegex": "trace_id=(\\w+)",
+              "name": "TraceID",
+              "url": "",
+              "datasourceUid": "${datasource_tempo}",
+              "matcherType": "label"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 42 },
+      "id": 600,
+      "title": "Distributed Traces",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "tempo",
+            "uid": "${datasource_tempo}"
+          },
+          "description": "All distributed traces belonging to this user. Click any trace to see the full span waterfall.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 43 },
+          "id": 15,
+          "options": {},
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "tempo",
+                "uid": "${datasource_tempo}"
+              },
+              "queryType": "nativeSearch",
+              "serviceName": "$app",
+              "search": "enduser.id=$user_identifier",
+              "minDuration": "",
+              "maxDuration": "",
+              "limit": 20,
+              "refId": "A"
+            }
+          ],
+          "title": "User's Traces — Search",
+          "type": "traces"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource_mimir}"
+          },
+          "description": "P95 span duration for this service (not user-filtered — shows context).",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 10,
+                "gradientMode": "opacity",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              },
+              "unit": "s"
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 53 },
+          "id": 16,
+          "options": {
+            "legend": {
+              "calcs": ["sum", "mean", "max", "lastNotNull"],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "prometheus",
+                "uid": "${datasource_mimir}"
+              },
+              "editorMode": "code",
+              "expr": "histogram_quantile(0.95, sum(rate(traces_spanmetrics_duration_seconds_bucket{service=\"$app\"}[$__rate_interval])) by (le))",
+              "legendFormat": "P95 Duration",
+              "range": true,
+              "refId": "A"
+            }
+          ],
+          "title": "Trace Duration Over Time",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Traces that resulted in errors for this user. Click trace_id to investigate.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 53 },
+          "id": 17,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | level=\"error\" | trace_id!=\"\" | line_format \"{{.trace_id}} | {{.method}} {{.path}} | {{.msg}} | {{.response_time}}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Traces",
+          "type": "table"
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 53 },
+      "id": 700,
+      "title": "Errors & Exceptions",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "JavaScript exceptions this user encountered in the browser.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 54 },
+          "id": 18,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"exception\" | line_format \"{{.error_message}} | {{.page_url}} | {{.stacktrace}}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Frontend JS Errors (Faro)",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Server-side errors triggered by this user's requests.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 54 },
+          "id": 19,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | level=\"error\" | line_format \"{{.msg}} | {{.path}} | {{.trace_id}}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Backend Errors",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Error timeline comparing frontend exceptions and backend errors for this user.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "custom": {
+                "axisBorderShow": false,
+                "axisCenteredZero": false,
+                "axisColorMode": "text",
+                "axisLabel": "",
+                "axisPlacement": "auto",
+                "barAlignment": 0,
+                "drawStyle": "line",
+                "fillOpacity": 20,
+                "gradientMode": "opacity",
+                "hideFrom": {
+                  "legend": false,
+                  "tooltip": false,
+                  "viz": false
+                },
+                "insertNulls": false,
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "pointSize": 5,
+                "scaleDistribution": { "type": "linear" },
+                "showPoints": "auto",
+                "spanNulls": false,
+                "stacking": {
+                  "group": "A",
+                  "mode": "none"
+                },
+                "thresholdsStyle": { "mode": "off" }
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Frontend Errors" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FFB020", "mode": "fixed" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "Backend Errors" },
+                "properties": [
+                  { "id": "color", "value": { "fixedColor": "#FF4757", "mode": "fixed" } }
+                ]
+              }
+            ]
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 62 },
+          "id": 20,
+          "options": {
+            "legend": {
+              "calcs": ["sum", "mean", "max", "lastNotNull"],
+              "displayMode": "table",
+              "placement": "bottom",
+              "showLegend": true
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "count_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"exception\" [$__auto])",
+              "legendFormat": "Frontend Errors",
+              "queryType": "range",
+              "refId": "A"
+            },
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | level=\"error\" [$__auto])",
+              "legendFormat": "Backend Errors",
+              "queryType": "range",
+              "refId": "B"
+            }
+          ],
+          "title": "Error Timeline — Frontend + Backend",
+          "type": "timeseries"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Distribution of error types this user encountered.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "palette-classic"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 62 },
+          "id": 21,
+          "options": {
+            "displayLabels": [],
+            "legend": {
+              "displayMode": "table",
+              "placement": "right",
+              "showLegend": true,
+              "values": ["value", "percent"]
+            },
+            "pieType": "donut",
+            "reduceOptions": {
+              "calcs": ["lastNotNull"],
+              "fields": "",
+              "values": false
+            },
+            "tooltip": {
+              "mode": "multi",
+              "sort": "desc"
+            }
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (msg) (count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | level=\"error\" [$__range]))",
+              "legendFormat": "{{msg}}",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Error Distribution",
+          "type": "piechart"
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 62 },
+      "id": 800,
+      "title": "Profiling — Pyroscope",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "grafana-pyroscope-datasource",
+            "uid": "${datasource_pyroscope}"
+          },
+          "description": "CPU flamegraph filtered to this user's requests. Shows what code paths burned CPU.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 14, "w": 12, "x": 0, "y": 63 },
+          "id": 22,
+          "options": {},
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-pyroscope-datasource",
+                "uid": "${datasource_pyroscope}"
+              },
+              "profileTypeId": "process_cpu:cpu:nanoseconds:cpu:nanoseconds",
+              "labelSelector": "{service_name=\"$app\", user_id=\"$user_identifier\"}",
+              "queryType": "profile",
+              "refId": "A"
+            }
+          ],
+          "title": "CPU Profile (Flamegraph)",
+          "type": "flamegraph"
+        },
+        {
+          "datasource": {
+            "type": "grafana-pyroscope-datasource",
+            "uid": "${datasource_pyroscope}"
+          },
+          "description": "Memory allocation flamegraph for this user's requests.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 14, "w": 12, "x": 12, "y": 63 },
+          "id": 23,
+          "options": {},
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "grafana-pyroscope-datasource",
+                "uid": "${datasource_pyroscope}"
+              },
+              "profileTypeId": "memory:alloc_objects:count:space:bytes",
+              "labelSelector": "{service_name=\"$app\", user_id=\"$user_identifier\"}",
+              "queryType": "profile",
+              "refId": "A"
+            }
+          ],
+          "title": "Memory Profile (Flamegraph)",
+          "type": "flamegraph"
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 77 },
+      "id": 900,
+      "title": "Session Replay & Clicks",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "What buttons and links this user clicked, in chronological order.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 78 },
+          "id": 24,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"click\" | line_format \"{{.element_tag}} | {{.element_text}} | {{.page_url}}\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Click Events",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Page-to-page navigation transitions showing the user's journey flow.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 78 },
+          "id": 25,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "sum by (page_from, page_to) (count_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" | event_type=\"navigation\" [$__range]))",
+              "instant": true,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ],
+          "title": "Navigation Flow",
+          "type": "table"
+        }
+      ]
+    },
+    {
+      "collapsed": true,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 86 },
+      "id": 1000,
+      "title": "Security & Access Audit",
+      "type": "row",
+      "panels": [
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Authentication events for this user.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 87 },
+          "id": 26,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "{job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" | event=~\"login|logout|auth_failure|token_refresh|password_change\"",
+              "queryType": "range",
+              "refId": "A"
+            }
+          ],
+          "title": "Login & Auth Events",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "IP addresses this user connected from. Multiple IPs may indicate VPN or suspicious activity.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 87 },
+          "id": 27,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "topk(10, sum by (client_ip) (count_over_time({job=\"$app\"} | logfmt | user=~\".*$user_identifier.*\" [$__range])))",
+              "instant": true,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ],
+          "title": "IP Addresses Used",
+          "type": "table"
+        },
+        {
+          "datasource": {
+            "type": "loki",
+            "uid": "${datasource_loki}"
+          },
+          "description": "Browsers and devices this user has accessed the application from.",
+          "fieldConfig": {
+            "defaults": {
+              "color": {
+                "mode": "thresholds"
+              },
+              "custom": {
+                "align": "auto",
+                "cellOptions": { "type": "auto" },
+                "inspect": false
+              },
+              "mappings": [],
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null }
+                ]
+              }
+            },
+            "overrides": []
+          },
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 87 },
+          "id": 28,
+          "options": {
+            "cellHeight": "sm",
+            "footer": {
+              "countRows": false,
+              "fields": "",
+              "reducer": ["sum"],
+              "show": false
+            },
+            "showHeader": true,
+            "sortBy": []
+          },
+          "pluginVersion": "11.6.4",
+          "targets": [
+            {
+              "datasource": {
+                "type": "loki",
+                "uid": "${datasource_loki}"
+              },
+              "editorMode": "code",
+              "expr": "topk(5, sum by (user_agent) (count_over_time({job=\"faro\"} | logfmt | user_email=~\".*$user_identifier.*\" [$__range])))",
+              "instant": true,
+              "queryType": "instant",
+              "refId": "A"
+            }
+          ],
+          "title": "User Agents / Devices",
+          "type": "table"
+        }
+      ]
+    }
+  ],
+  "refresh": "",
+  "schemaVersion": 39,
+  "tags": [
+    "user-journey",
+    "observability",
+    "faro",
+    "loki",
+    "tempo",
+    "pyroscope",
+    "rum"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Logs (Loki)",
+        "multi": false,
+        "name": "datasource_loki",
+        "options": [],
+        "query": "loki",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Metrics (Mimir)",
+        "multi": false,
+        "name": "datasource_mimir",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Traces (Tempo)",
+        "multi": false,
+        "name": "datasource_tempo",
+        "options": [],
+        "query": "tempo",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Profiles (Pyroscope)",
+        "multi": false,
+        "name": "datasource_pyroscope",
+        "options": [],
+        "query": "grafana-pyroscope-datasource",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "description": "Enter user email, user_id, or username to filter the entire dashboard",
+        "hide": 0,
+        "label": "User (email / ID / username)",
+        "name": "user_identifier",
+        "options": [
+          {
+            "selected": true,
+            "text": "",
+            "value": ""
+          }
+        ],
+        "query": "",
+        "skipUrlSync": false,
+        "type": "textbox"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": ["All"],
+          "value": ["$__all"]
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource_mimir}"
+        },
+        "definition": "label_values(kube_pod_info, namespace)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Namespace",
+        "multi": true,
+        "name": "namespace",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(kube_pod_info, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": false,
+          "text": "",
+          "value": ""
+        },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource_mimir}"
+        },
+        "definition": "label_values(http_requests_total{namespace=~\"$namespace\"}, job)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Application",
+        "multi": false,
+        "name": "app",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(http_requests_total{namespace=~\"$namespace\"}, job)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 2,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "production",
+          "value": "production"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Environment",
+        "multi": false,
+        "name": "environment",
+        "options": [
+          {
+            "selected": true,
+            "text": "production",
+            "value": "production"
+          },
+          {
+            "selected": false,
+            "text": "staging",
+            "value": "staging"
+          },
+          {
+            "selected": false,
+            "text": "development",
+            "value": "development"
+          }
+        ],
+        "query": "production,staging,development",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "User Journey & Activity — Full Stack Correlation",
+  "uid": "user-journey-dashboard",
+  "version": 1,
+  "weekStart": ""
+}
