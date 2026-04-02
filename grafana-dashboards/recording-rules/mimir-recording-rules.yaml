@@ -1,0 +1,172 @@
+# =============================================================================
+# Mimir / Prometheus Recording Rules
+# =============================================================================
+# Pre-aggregated SLI metrics for fast dashboard rendering and alerting.
+# These rules reduce cardinality at query time and provide canonical
+# metric names that dashboards and alerts reference.
+#
+# Naming convention:  <level>:<metric>:<operation>
+#   level     = aggregation dimensions (e.g. job, cluster_namespace_job)
+#   metric    = base metric name
+#   operation = rate window or aggregation (e.g. rate5m, p99)
+# =============================================================================
+
+groups:
+  # ---------------------------------------------------------------------------
+  # Request Rate & Error Rate SLIs
+  # ---------------------------------------------------------------------------
+  - name: sli-request-recording-rules
+    interval: 30s
+    rules:
+      # --- Total request rate -------------------------------------------------
+      - record: job:http_requests:rate5m
+        expr: |
+          sum(rate(http_requests_total[5m])) by (cluster, namespace, job)
+
+      - record: job:http_requests:rate1m
+        expr: |
+          sum(rate(http_requests_total[1m])) by (cluster, namespace, job)
+
+      - record: job:http_requests:rate30m
+        expr: |
+          sum(rate(http_requests_total[30m])) by (cluster, namespace, job)
+
+      - record: job:http_requests:rate1h
+        expr: |
+          sum(rate(http_requests_total[1h])) by (cluster, namespace, job)
+
+      # --- 5xx error rate -----------------------------------------------------
+      - record: job:http_errors:rate5m
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m])) by (cluster, namespace, job)
+
+      - record: job:http_errors:rate1h
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[1h])) by (cluster, namespace, job)
+
+      - record: job:http_errors:rate6h
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[6h])) by (cluster, namespace, job)
+
+      # --- Error ratio (availability inverse) ---------------------------------
+      - record: job:http_error_ratio:rate5m
+        expr: |
+          job:http_errors:rate5m / job:http_requests:rate5m
+
+      - record: job:http_error_ratio:rate1h
+        expr: |
+          job:http_errors:rate1h / job:http_requests:rate1h
+
+      - record: job:http_error_ratio:rate6h
+        expr: |
+          job:http_errors:rate6h
+          /
+          (sum(rate(http_requests_total[6h])) by (cluster, namespace, job))
+
+  # ---------------------------------------------------------------------------
+  # Latency Percentile SLIs
+  # ---------------------------------------------------------------------------
+  - name: sli-latency-recording-rules
+    interval: 30s
+    rules:
+      - record: job:http_request_duration_seconds:p50
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, cluster, namespace, job)
+          )
+
+      - record: job:http_request_duration_seconds:p90
+        expr: |
+          histogram_quantile(0.90,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, cluster, namespace, job)
+          )
+
+      - record: job:http_request_duration_seconds:p95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, cluster, namespace, job)
+          )
+
+      - record: job:http_request_duration_seconds:p99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, cluster, namespace, job)
+          )
+
+      - record: job:http_request_duration_seconds:p999
+        expr: |
+          histogram_quantile(0.999,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, cluster, namespace, job)
+          )
+
+  # ---------------------------------------------------------------------------
+  # SLO Availability & Burn-Rate Rules
+  # ---------------------------------------------------------------------------
+  - name: sli-slo-recording-rules
+    interval: 30s
+    rules:
+      # --- Availability = 1 - error_ratio ------------------------------------
+      - record: job:slo_availability:ratio5m
+        expr: |
+          1 - job:http_error_ratio:rate5m
+
+      - record: job:slo_availability:ratio1h
+        expr: |
+          1 - job:http_error_ratio:rate1h
+
+      # --- Burn rates (error_ratio / error_budget) ---------------------------
+      # SLO = 99.9%  =>  error_budget = 0.001
+      - record: job:slo_burn_rate:5m
+        expr: |
+          job:http_error_ratio:rate5m / 0.001
+
+      - record: job:slo_burn_rate:30m
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[30m])) by (cluster, namespace, job)
+          /
+            sum(rate(http_requests_total[30m])) by (cluster, namespace, job)
+          ) / 0.001
+
+      - record: job:slo_burn_rate:1h
+        expr: |
+          job:http_error_ratio:rate1h / 0.001
+
+      - record: job:slo_burn_rate:6h
+        expr: |
+          job:http_error_ratio:rate6h / 0.001
+
+      # --- Budget remaining (rolling 30-day window) --------------------------
+      # Approximation: 1 - (avg_over_time of 1h burn rate * elapsed_fraction)
+      - record: job:slo_budget_remaining:ratio
+        expr: |
+          1 - (job:http_error_ratio:rate1h / 0.001) * (1 / 720)
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure Utilisation SLIs
+  # ---------------------------------------------------------------------------
+  - name: sli-infrastructure-recording-rules
+    interval: 60s
+    rules:
+      - record: namespace:container_cpu_usage:rate5m
+        expr: |
+          sum(rate(container_cpu_usage_seconds_total{container!=""}[5m]))
+            by (cluster, namespace)
+
+      - record: namespace:container_memory_working_set:bytes
+        expr: |
+          sum(container_memory_working_set_bytes{container!=""})
+            by (cluster, namespace)
+
+      - record: namespace:container_cpu_throttle_ratio:rate5m
+        expr: |
+          sum(rate(container_cpu_cfs_throttled_seconds_total{container!=""}[5m]))
+            by (cluster, namespace)
+          /
+          sum(rate(container_cpu_cfs_periods_total{container!=""}[5m]))
+            by (cluster, namespace)
+
+      - record: namespace:kube_pod_restarts:increase1h
+        expr: |
+          sum(increase(kube_pod_container_status_restarts_total[1h]))
+            by (cluster, namespace)

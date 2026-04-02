@@ -1,0 +1,253 @@
+# =============================================================================
+# Mimir / Prometheus Alert Rules
+# =============================================================================
+# Deployed via Mimir ruler API or as PrometheusRule CRDs in Kubernetes.
+# Covers: error rates, latency SLOs, SLO budget burn, pod health,
+#         CPU throttling, memory pressure, goroutine leaks, disk pressure.
+# =============================================================================
+
+groups:
+  # ---------------------------------------------------------------------------
+  # Application SLO Alerts  (RED + SLO burn-rate)
+  # ---------------------------------------------------------------------------
+  - name: application-slo-alerts
+    interval: 30s
+    rules:
+      # --- Error-rate alerts (two-tier: warning / critical) -------------------
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) by (cluster, namespace, job)
+          /
+            sum(rate(http_requests_total[5m])) by (cluster, namespace, job)
+          ) * 100 > 1
+        for: 5m
+        labels:
+          severity: warning
+          signal: metrics
+        annotations:
+          summary: "High error rate on {{ $labels.job }} in {{ $labels.namespace }}"
+          description: >-
+            Error rate is {{ $value | printf "%.2f" }}% (threshold: 1%)
+            for job={{ $labels.job }} cluster={{ $labels.cluster }}.
+          dashboard: "/d/app-overview-4signal"
+          runbook: "https://wiki.internal/runbooks/high-error-rate"
+
+      - alert: CriticalErrorRate
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) by (cluster, namespace, job)
+          /
+            sum(rate(http_requests_total[5m])) by (cluster, namespace, job)
+          ) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          signal: metrics
+        annotations:
+          summary: "Critical error rate on {{ $labels.job }} in {{ $labels.namespace }}"
+          description: >-
+            Error rate is {{ $value | printf "%.2f" }}% (threshold: 5%)
+            for job={{ $labels.job }} cluster={{ $labels.cluster }}.
+          dashboard: "/d/app-overview-4signal"
+          runbook: "https://wiki.internal/runbooks/critical-error-rate"
+
+      # --- Latency alerts (P95 + P99) ----------------------------------------
+      - alert: HighP95Latency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, cluster, namespace, job)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          signal: metrics
+        annotations:
+          summary: "P95 latency above 1s on {{ $labels.job }}"
+          description: >-
+            P95 latency is {{ $value | printf "%.3f" }}s
+            for job={{ $labels.job }} in {{ $labels.namespace }}.
+          dashboard: "/d/app-overview-4signal"
+
+      - alert: HighP99Latency
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, cluster, namespace, job)
+          ) > 2
+        for: 5m
+        labels:
+          severity: critical
+          signal: metrics
+        annotations:
+          summary: "P99 latency above 2s on {{ $labels.job }}"
+          description: >-
+            P99 latency is {{ $value | printf "%.3f" }}s
+            for job={{ $labels.job }} in {{ $labels.namespace }}.
+          dashboard: "/d/app-overview-4signal"
+          runbook: "https://wiki.internal/runbooks/high-latency"
+
+      # --- Multi-window SLO burn-rate (Google SRE ch.5 approach) --------------
+      # 99.9% SLO  =>  error budget = 0.001
+      # Fast burn: 1h window @ 14.4x  AND  5m window @ 14.4x  (pages in ~1h)
+      # Slow burn: 6h window @ 6x     AND  30m window @ 6x    (pages in ~3.3h)
+      - alert: SLOBudgetBurnRateCritical
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[1h])) by (cluster, namespace, job)
+          /
+            sum(rate(http_requests_total[1h])) by (cluster, namespace, job)
+          ) / 0.001 > 14.4
+          and
+          (
+            sum(rate(http_requests_total{status=~"5.."}[5m])) by (cluster, namespace, job)
+          /
+            sum(rate(http_requests_total[5m])) by (cluster, namespace, job)
+          ) / 0.001 > 14.4
+        for: 2m
+        labels:
+          severity: critical
+          signal: metrics
+          slo: "true"
+        annotations:
+          summary: "SLO budget burning >14x on {{ $labels.job }}"
+          description: >-
+            Multi-window burn rate exceeded 14.4x the sustainable rate.
+            At this pace the entire monthly error budget will be exhausted
+            in less than 1 hour.
+          dashboard: "/d/slo-overview"
+          runbook: "https://wiki.internal/runbooks/slo-burn-rate"
+
+      - alert: SLOBudgetBurnRateHigh
+        expr: |
+          (
+            sum(rate(http_requests_total{status=~"5.."}[6h])) by (cluster, namespace, job)
+          /
+            sum(rate(http_requests_total[6h])) by (cluster, namespace, job)
+          ) / 0.001 > 6
+          and
+          (
+            sum(rate(http_requests_total{status=~"5.."}[30m])) by (cluster, namespace, job)
+          /
+            sum(rate(http_requests_total[30m])) by (cluster, namespace, job)
+          ) / 0.001 > 6
+        for: 15m
+        labels:
+          severity: warning
+          signal: metrics
+          slo: "true"
+        annotations:
+          summary: "SLO budget burning >6x on {{ $labels.job }}"
+          description: >-
+            Slow-burn multi-window rate exceeded 6x sustainable.
+            Budget will be exhausted within ~3.3 hours at this pace.
+          dashboard: "/d/slo-overview"
+
+  # ---------------------------------------------------------------------------
+  # Infrastructure / Kubernetes Resource Alerts
+  # ---------------------------------------------------------------------------
+  - name: infrastructure-resource-alerts
+    interval: 30s
+    rules:
+      - alert: PodCrashLooping
+        expr: |
+          increase(kube_pod_container_status_restarts_total[1h]) > 3
+        for: 5m
+        labels:
+          severity: warning
+          signal: metrics
+        annotations:
+          summary: "Pod {{ $labels.pod }} crash-looping in {{ $labels.namespace }}"
+          description: >-
+            Container {{ $labels.container }} in pod {{ $labels.pod }} has
+            restarted {{ $value | printf "%.0f" }} times in the last hour.
+          runbook: "https://wiki.internal/runbooks/pod-crash-loop"
+
+      - alert: CPUThrottling
+        expr: |
+          (
+            rate(container_cpu_cfs_throttled_seconds_total{container!=""}[5m])
+          /
+            rate(container_cpu_cfs_periods_total{container!=""}[5m])
+          ) > 0.25
+        for: 10m
+        labels:
+          severity: warning
+          signal: metrics
+        annotations:
+          summary: "CPU throttling >25% on {{ $labels.pod }}/{{ $labels.container }}"
+          description: >-
+            Container {{ $labels.container }} is being throttled
+            {{ $value | printf "%.0f" }}% of CPU periods.
+          dashboard: "/d/k8s-resource-overview"
+
+      - alert: MemoryApproachingLimit
+        expr: |
+          (
+            container_memory_working_set_bytes{container!=""}
+          /
+            container_spec_memory_limit_bytes{container!=""}
+          ) > 0.9
+          and
+          container_spec_memory_limit_bytes{container!=""} > 0
+        for: 5m
+        labels:
+          severity: warning
+          signal: metrics
+        annotations:
+          summary: "Memory >90% of limit on {{ $labels.pod }}/{{ $labels.container }}"
+          description: >-
+            Working set {{ $value | printf "%.0f" }}% of memory limit.
+            OOMKill is imminent if usage continues to grow.
+          dashboard: "/d/k8s-resource-overview"
+          runbook: "https://wiki.internal/runbooks/memory-pressure"
+
+      - alert: HighGoroutineCount
+        expr: |
+          go_goroutines > 10000
+        for: 10m
+        labels:
+          severity: warning
+          signal: metrics
+        annotations:
+          summary: "Goroutine count >10k on {{ $labels.job }} ({{ $labels.instance }})"
+          description: >-
+            {{ $value | printf "%.0f" }} goroutines detected.
+            This may indicate a goroutine leak.
+          runbook: "https://wiki.internal/runbooks/goroutine-leak"
+
+      - alert: PersistentVolumeFilling
+        expr: |
+          (
+            kubelet_volume_stats_used_bytes
+          /
+            kubelet_volume_stats_capacity_bytes
+          ) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          signal: metrics
+        annotations:
+          summary: "PV {{ $labels.persistentvolumeclaim }} is >85% full"
+          description: >-
+            Volume {{ $labels.persistentvolumeclaim }} in
+            {{ $labels.namespace }} is at {{ $value | printf "%.0f" }}% capacity.
+          runbook: "https://wiki.internal/runbooks/disk-pressure"
+
+      - alert: PersistentVolumeCritical
+        expr: |
+          (
+            kubelet_volume_stats_used_bytes
+          /
+            kubelet_volume_stats_capacity_bytes
+          ) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          signal: metrics
+        annotations:
+          summary: "PV {{ $labels.persistentvolumeclaim }} is >95% full"
+          description: >-
+            Volume {{ $labels.persistentvolumeclaim }} in
+            {{ $labels.namespace }} is at {{ $value | printf "%.0f" }}% capacity.
+            Immediate action required.
+          runbook: "https://wiki.internal/runbooks/disk-pressure"

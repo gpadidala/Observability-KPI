@@ -1,0 +1,197 @@
+# =============================================================================
+# Loki Ruler Alert Rules  (LogQL)
+# =============================================================================
+# Deployed via Loki ruler API or stored in object storage under
+# /loki/rules/<tenant>/.  These complement the PromQL alerts in
+# mimir-alert-rules.yaml with log-content-aware detection.
+# =============================================================================
+
+groups:
+  # ---------------------------------------------------------------------------
+  # Log-based Application Alerts
+  # ---------------------------------------------------------------------------
+  - name: log-based-alerts
+    rules:
+      # --- Error-log volume ---------------------------------------------------
+      - alert: HighErrorLogRate
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} | logfmt | level="error" [5m]
+            )
+          ) > 100
+        for: 5m
+        labels:
+          severity: warning
+          signal: logs
+        annotations:
+          summary: "High error log rate for {{ $labels.job }}"
+          description: >-
+            {{ $value | printf "%.0f" }} error-level log lines in the last
+            5 minutes for job={{ $labels.job }} in {{ $labels.namespace }}.
+          dashboard: "/d/app-overview-4signal"
+
+      - alert: CriticalErrorLogRate
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} | logfmt | level="error" [5m]
+            )
+          ) > 500
+        for: 2m
+        labels:
+          severity: critical
+          signal: logs
+        annotations:
+          summary: "Critical error log rate for {{ $labels.job }}"
+          description: >-
+            {{ $value | printf "%.0f" }} error-level log lines in 5 minutes.
+            This is 5x the warning threshold.
+          dashboard: "/d/app-overview-4signal"
+
+      # --- OOM detection ------------------------------------------------------
+      - alert: OOMDetected
+        expr: |
+          sum by (cluster, namespace) (
+            count_over_time(
+              {job=~".+"} |~ "OOMKilled|Out of memory|oom-kill" [5m]
+            )
+          ) > 0
+        for: 0m
+        labels:
+          severity: critical
+          signal: logs
+        annotations:
+          summary: "OOM kill detected in {{ $labels.namespace }}"
+          description: >-
+            At least one OOMKilled event found in the log stream.
+            Investigate pod memory limits immediately.
+          runbook: "https://wiki.internal/runbooks/oom-detected"
+
+      # --- Panic / fatal crash ------------------------------------------------
+      - alert: PanicDetected
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} |~ "panic:|PANIC|fatal error:" [5m]
+            )
+          ) > 0
+        for: 0m
+        labels:
+          severity: critical
+          signal: logs
+        annotations:
+          summary: "Panic/fatal error detected in {{ $labels.job }}"
+          description: >-
+            A panic or fatal error was logged. This usually indicates an
+            unrecoverable application crash.
+          runbook: "https://wiki.internal/runbooks/panic-detected"
+
+      # --- Connection-related errors ------------------------------------------
+      - alert: ConnectionRefused
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} |= "connection refused" [5m]
+            )
+          ) > 10
+        for: 5m
+        labels:
+          severity: warning
+          signal: logs
+        annotations:
+          summary: "Repeated connection-refused errors on {{ $labels.job }}"
+          description: >-
+            {{ $value | printf "%.0f" }} connection-refused messages in
+            5 minutes. A downstream dependency may be unreachable.
+
+      # --- Timeout errors -----------------------------------------------------
+      - alert: TimeoutErrors
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} |~ "context deadline exceeded|timeout|request timed out" [5m]
+            )
+          ) > 20
+        for: 5m
+        labels:
+          severity: warning
+          signal: logs
+        annotations:
+          summary: "Excessive timeouts on {{ $labels.job }}"
+          description: >-
+            {{ $value | printf "%.0f" }} timeout messages in 5 minutes.
+            Check network, DNS, or downstream service health.
+
+      # --- Authentication / authorisation failures ----------------------------
+      - alert: AuthenticationFailureSpike
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} |~ "(?i)unauthorized|authentication failed|403 Forbidden|401 Unauthorized" [5m]
+            )
+          ) > 50
+        for: 5m
+        labels:
+          severity: warning
+          signal: logs
+        annotations:
+          summary: "Auth failure spike on {{ $labels.job }}"
+          description: >-
+            {{ $value | printf "%.0f" }} auth-failure log entries in 5 min.
+            This could be a credential misconfiguration or a brute-force attempt.
+
+      # --- DNS resolution failures --------------------------------------------
+      - alert: DNSResolutionFailure
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} |~ "(?i)dns.*lookup.*failed|no such host|could not resolve" [5m]
+            )
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          signal: logs
+        annotations:
+          summary: "DNS resolution failures in {{ $labels.job }}"
+          description: >-
+            {{ $value | printf "%.0f" }} DNS resolution failures in 5 minutes.
+            Check CoreDNS health and upstream resolvers.
+
+      # --- Disk / storage I/O errors in logs ----------------------------------
+      - alert: DiskIOErrors
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} |~ "(?i)input/output error|no space left on device|read-only file system" [5m]
+            )
+          ) > 0
+        for: 0m
+        labels:
+          severity: critical
+          signal: logs
+        annotations:
+          summary: "Disk I/O error detected in {{ $labels.job }}"
+          description: >-
+            Storage-layer error found in logs.  The underlying volume may be
+            full, degraded, or mounted read-only.
+          runbook: "https://wiki.internal/runbooks/disk-io-error"
+
+      # --- High warn-level log rate (early indicator) -------------------------
+      - alert: HighWarningLogRate
+        expr: |
+          sum by (cluster, namespace, job) (
+            count_over_time(
+              {job=~".+"} | logfmt | level="warn" [5m]
+            )
+          ) > 500
+        for: 10m
+        labels:
+          severity: info
+          signal: logs
+        annotations:
+          summary: "Elevated warning-level log rate on {{ $labels.job }}"
+          description: >-
+            {{ $value | printf "%.0f" }} warning-level log lines in 5 min.
+            While not immediately actionable, this often precedes errors.
